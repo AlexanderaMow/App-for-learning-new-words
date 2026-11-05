@@ -71,8 +71,19 @@ const STORE_OK=(()=>{try{localStorage.setItem('slova-t','1');return localStorage
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
 const WARN='<p class="warn"><b>Браузер не сохраняет данные этого сайта.</b> Слова пропадут после обновления страницы. Открой сайт в обычном (не приватном) окне Chrome или Safari по адресу github.io, а не во встроенном просмотре или в браузере внутри мессенджера. Пока что можно сделать «Резервную копию» (кнопка внизу главной страницы).</p>';
 function load(k,def){try{const j=JSON.parse(localStorage.getItem(k));if(Array.isArray(j))return j}catch(e){}return def}
-function save(){try{localStorage.setItem(KEY,JSON.stringify({folders,mods}));localStorage.setItem('slova-folders',JSON.stringify(folders))}catch(e){}}
-let mods=load(KEY,[{id:uid(),name:'Французский: пример',lang:'fr',words:[{f:'la maison',r:'дом'},{f:'le chat',r:'кот'},{f:'bonjour',r:'здравствуйте'},{f:'merci beaucoup',r:'большое спасибо'},{f:'l’école',r:'школа'}]}]),folders=load('slova-folders',[]),view={name:'home'},S=null;
+function readSavedData(){
+ try{
+  const j=JSON.parse(localStorage.getItem(KEY));
+  if(j&&typeof j==='object'&&!Array.isArray(j)&&Array.isArray(j.mods)&&Array.isArray(j.folders))
+   return {mods:j.mods,folders:j.folders};
+  // Поддержка старого формата, если он использовался в предыдущей версии сайта.
+  if(Array.isArray(j))return {mods:j,folders:load('slova-folders',[])};
+ }catch(e){}
+ return null;
+}
+const savedData=readSavedData();
+function save(){try{localStorage.setItem(KEY,JSON.stringify({folders,mods}));localStorage.setItem('slova-folders',JSON.stringify(folders))}catch(e){console.error('Не удалось сохранить данные:',e)}}
+let mods=savedData?savedData.mods:[{id:uid(),name:'Французский: пример',lang:'fr',words:[{f:'la maison',r:'дом'},{f:'le chat',r:'кот'},{f:'bonjour',r:'здравствуйте'},{f:'merci beaucoup',r:'большое спасибо'},{f:'l’école',r:'школа'}]}],folders=savedData?savedData.folders:load('slova-folders',[]),view={name:'home'},S=null;
 const cur=()=>mods.find(m=>m.id===view.id);
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 const alts=(s,ru)=>{const o=[];let d=0,c='';for(const ch of s){if(ch==='(')d++;if(ch===')')d=Math.max(0,d-1);if(!d&&(ch==='/'||ch===';'||(ru&&ch===','))){o.push(c);c=''}else c+=ch}o.push(c);return o};
