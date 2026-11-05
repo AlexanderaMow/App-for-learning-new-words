@@ -133,17 +133,23 @@ const b64e=o=>btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/
 const b64d=s=>JSON.parse(decodeURIComponent(escape(atob(s.replace(/-/g,'+').replace(/_/g,'/')))));
 const pack=m=>({n:m.name,l:m.lang,w:m.words.map(w=>[w.f,w.r])});
 const okP=d=>d&&Array.isArray(d.ms)&&d.ms.length&&d.ms.every(m=>m&&LANGS[m.l]&&m.n&&Array.isArray(m.w));
-const shareLink=()=>location.href.split('#')[0]+'#m='+b64e(view.fid?{fn:fold(view.fid).name,ms:inF(view.fid).map(pack)}:{ms:[pack(cur())]});
+const shareData=()=>view.fid?{fn:fold(view.fid).name,ms:inF(view.fid).map(pack)}:{ms:[pack(cur())]};
+const bytesToB64Url=bytes=>{let bin='';for(let i=0;i<bytes.length;i++)bin+=String.fromCharCode(bytes[i]);return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')};
+const b64UrlToBytes=s=>{const bin=atob(s.replace(/-/g,'+').replace(/_/g,'/'));const a=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);return a};
+async function shareLink(){const base=location.href.split('#')[0],json=JSON.stringify(shareData());
+ try{if(typeof CompressionStream==='function'){const stream=new Blob([new TextEncoder().encode(json)]).stream().pipeThrough(new CompressionStream('gzip'));const bytes=new Uint8Array(await new Response(stream).arrayBuffer());return base+'#z='+bytesToB64Url(bytes)}}catch(e){}
+ return base+'#m='+b64e(shareData())}
+async function readShareHash(hash){if(hash.startsWith('#z=')){if(typeof DecompressionStream!=='function')throw Error('Этот браузер не поддерживает сжатые ссылки. Обнови Safari или Chrome.');const bytes=b64UrlToBytes(hash.slice(3));const stream=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));return JSON.parse(new TextDecoder().decode(await new Response(stream).arrayBuffer()))}if(hash.startsWith('#m='))return b64d(hash.slice(3));return null}
 const clearHash=()=>{try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}};
 
-function vShare1(){const f=view.fid,link=shareLink();
+function vShare1(){const f=view.fid;
  return (f?back('fold','Назад',f):back('open','Назад',view.id))+`<h1>Поделиться: ${esc(srcTitle())}</h1>
 <ol class="steps"><li>Нажми «Скопировать ссылку».</li><li>Вставь её в сообщение другу (Telegram, WhatsApp, почта).</li><li>Друг открывает ссылку, и сайт предлагает добавить ${f?'папку с модулями':'модуль'} к его словам. У тебя ничего не меняется.</li></ol>
 <div class="row"><button class="btn" data-act="copy">Скопировать ссылку</button>${navigator.share?'<button class="btn ghost" data-act="nshare">Отправить…</button>':''}</div>
 <p id="fbk" class="muted small"></p>
-<label>Ссылка<textarea id="ex" rows="3" readonly>${esc(link)}</textarea></label>
+<label>Ссылка<textarea id="ex" rows="3" readonly placeholder="Подготавливаю короткую ссылку…"></textarea></label>
+<p id="linkwarn" class="err small"></p>
 ${location.protocol==='file:'?'<p class="err small">Сейчас приложение открыто как файл, и такая ссылка у друга не откроется. Открой сайт по адресу на github.io и поделись оттуда.</p>':''}
-${link.length>8000?'<p class="err small">Ссылка получилась очень длинной, и мессенджер может её обрезать. Если так, раздели модуль на несколько небольших.</p>':''}
 <p class="muted small">Если у друга приложение добавлено на главный экран телефона, пусть откроет в нём «Получить от друга» и вставит ссылку туда.</p>`}
 
 function vIncoming(){const d=view.data,ms=d.ms,n=ms.reduce((s,m)=>s+m.w.length,0);
@@ -215,7 +221,8 @@ function render(){const v=view.name;
  app.innerHTML=(STORE_OK?'':WARN)+({home:vHome,mod:vMod,fold:vFold,fname:vFname,receive:vReceive,share1:vShare1,incoming:vIncoming,edit:vEdit,cards:vCards,write:vWrite,res:vRes,setup:vSetup,share:vShare})[v]();
  app.dataset.lang=cur()?cur().lang:'';
  const i=$('#fn')||(S&&!S.checked?$('#ans'):null);if(i)i.focus();
- if(!(v==='write'&&S.checked))window.scrollTo(0,0)}
+ if(!(v==='write'&&S.checked))window.scrollTo(0,0);
+ if(v==='share1')shareLink().then(link=>{const ex=$('#ex');if(ex)ex.value=link;const w=$('#linkwarn');if(w&&link.length>8000)w.textContent='Ссылка всё ещё очень длинная. Возможно, стоит разделить папку на несколько частей.'}).catch(()=>{const f=$('#fbk');if(f)f.textContent='Не удалось подготовить ссылку.'})}
 
 let cfg=Object.assign({show:'r',case:false,paren:false},(()=>{try{return JSON.parse(localStorage.getItem('slova-cfg'))||{}}catch(e){return{}}})());
 function start(mode,items){S={mode,all:items,deck:shuffle(items.slice()),i:0,round:1,wrong:[],checked:null};view={name:mode,id:view.id,fid:view.fid};render()}
@@ -271,7 +278,7 @@ const ACT={
  share(){view={name:'share'};render()},
  share1(){view={name:'share1',id:view.id,fid:view.fid};render()},
  nshare(){const f=$('#fbk'),no='Меню отправки не открылось. Нажми «Скопировать ссылку» и вставь её в сообщение.';
-  try{navigator.share({title:srcTitle(),url:shareLink()}).catch(e=>{if(!e||e.name!=='AbortError')f.textContent=no})}catch(e){f.textContent=no}},
+  shareLink().then(url=>navigator.share({title:srcTitle(),url})).catch(e=>{if(!e||e.name!=='AbortError')f.textContent=no})},
  acc(){const d=view.data;let fid='',last=null;if(d.fn){fid=uid();folders.push({id:fid,name:String(d.fn)})}
   d.ms.forEach(m=>{const ws=m.w.filter(x=>Array.isArray(x)&&x[0]&&x[1]).map(x=>({f:String(x[0]),r:String(x[1])}));
    if(ws.length){last={id:uid(),name:String(m.n),lang:m.l,fid,words:ws};mods.push(last)}});
@@ -281,8 +288,8 @@ const ACT={
  recv(){view={name:'receive'};render()},
  paste(){const f=$('#fbk'),no='Браузер не дал прочитать буфер. Нажми в поле выше, удерживай и выбери «Вставить».';
   try{navigator.clipboard.readText().then(s=>{$('#im').value=s;f.textContent=''}).catch(()=>{f.textContent=no})}catch(e){f.textContent=no}},
- imp(){try{const txt=$('#im').value,k=txt.indexOf('#m=');
-  if(k>=0){const d=b64d(txt.slice(k+3).trim().split(/\s/)[0]);if(!okP(d))throw 0;view={name:'incoming',data:d};render();return}
+ imp(){(async()=>{try{const txt=$('#im').value.trim(),hashAt=txt.indexOf('#');
+  if(hashAt>=0&&(txt.slice(hashAt).startsWith('#m=')||txt.slice(hashAt).startsWith('#z='))){const d=await readShareHash(txt.slice(hashAt).split(/\s/)[0]);if(!okP(d))throw 0;view={name:'incoming',data:d};render();return}
   let j=JSON.parse(txt);if(Array.isArray(j))j={folders:[],mods:j};
   if(!j||!Array.isArray(j.mods))throw 0;const map={};
   (j.folders||[]).forEach(f=>{if(f&&f.name){const id=uid();map[f.id]=id;folders.push({id,name:String(f.name)})}});
@@ -290,15 +297,15 @@ const ACT={
    const ws=m.words.filter(w=>w&&w.f&&w.r).map(w=>({f:String(w.f),r:String(w.r)}));
    if(ws.length){mods.push({id:uid(),name:String(m.name),lang:m.lang,fid:map[m.fid]||'',words:ws});n++}}});
   save();view={name:'home',note:'Добавлено модулей: '+n}}
-  catch(e){view.note='Не получилось прочитать. Вставь ссылку или текст целиком.'}
-  render()}
+  catch(e){view.note=e&&e.message?e.message:'Не получилось прочитать. Вставь ссылку или текст целиком.'}
+  render()})()}
 };
 document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(b&&ACT[b.dataset.act])ACT[b.dataset.act](b,b.dataset.id)});
 document.addEventListener('keydown',e=>{
  if(e.key==='Enter'&&view.name==='write'&&(e.target.id==='ans'||e.target===document.body)){e.preventDefault();S.checked?ACT.next():ACT.check()}});
-function checkHash(){if(location.hash.startsWith('#m=')){try{const d=b64d(location.hash.slice(3));if(okP(d))view={name:'incoming',data:d}}catch(e){}}}
-window.addEventListener&&window.addEventListener('hashchange',()=>{checkHash();render()});
-checkHash();
+async function checkHash(){if(location.hash.startsWith('#m=')||location.hash.startsWith('#z=')){try{const d=await readShareHash(location.hash);if(okP(d))view={name:'incoming',data:d}}catch(e){view={name:'home',note:e&&e.message?e.message:'Не удалось открыть ссылку.'}}}}
+window.addEventListener&&window.addEventListener('hashchange',async()=>{await checkHash();render()});
+checkHash().then(()=>render());
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='fn'){e.preventDefault();ACT.sf()}});
 render();
 </script>
