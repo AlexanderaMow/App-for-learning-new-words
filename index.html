@@ -139,7 +139,7 @@ window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredIns
 window.addEventListener('appinstalled',()=>{deferredInstall=null;view={name:'home',note:'Готово: ярлык добавлен.'};render()});
 function vInstall(){
  return back('home','Все модули')+`<h1>Ярлык на экран</h1>
-<p class="muted">Приложение «Слова» появится среди других иконок и будет открываться на весь экран, без адресной строки. Слова уже сохранены в браузере и в ярлыке не потеряются.</p>
+<p class="muted">Приложение «Слова» появится среди других иконок и будет открываться на весь экран, без адресной строки. Слова уже сохранены в браузере и в ярлыке не потеряются. Если у тебя нет кнопки «Добавить ярлык», воспользуйся инструкцией снизу.</p>
 ${deferredInstall?'<div class="row"><button class="btn" data-act="doinstall">Добавить ярлык</button></div>':''}
 <div class="ins"><h2>iPhone и iPad (Safari)</h2><ol class="steps"><li>Открой сайт именно в Safari, не в Chrome и не внутри мессенджера.</li><li>Нажми кнопку «Поделиться» (квадрат со стрелкой вверх).</li><li>Выбери «На экран “Домой”» и нажми «Добавить».</li></ol></div>
 <div class="ins"><h2>Android (Chrome)</h2><ol class="steps"><li>Нажми меню ⋮ в правом верхнем углу.</li><li>Выбери «Установить приложение» или «Добавить на главный экран».</li></ol></div>
