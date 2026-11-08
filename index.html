@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Слова</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="theme-color" content="#f4b27a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Слова">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <style>
 :root{--ink:#4a3826;--muted:#8a7660;--paper:#fffaee;--card:#fffefb;--line:#f3e7c9;--accent:#f4b27a;--on:#4a2a10;--ok:#a9d3a0;--bad:#f2a99a;--lang:#e8a05a;--at:#b4561c;--dt:#b4432f;--kt:#3e7d3a}
 @media (prefers-color-scheme:dark){:root{--ink:#f6e9d0;--muted:#c4b296;--paper:#2c2517;--card:#383020;--line:#4f4430;--accent:#f4b27a;--on:#3a2410;--ok:#a9d3a0;--bad:#f2a99a;--at:#f4b27a;--dt:#f2a99a;--kt:#a9d3a0}}
@@ -56,6 +64,9 @@ small{color:var(--muted)}
 .warn{background:#fde8c8;border:1px solid #f0b36b;border-radius:10px;padding:12px;font-size:14px;color:#4a2a10;margin:0 0 14px}
 .steps{padding-left:20px;margin:10px 0}.steps li{margin:6px 0}
 .mod.fld{border-left-color:var(--accent);background:var(--paper)}
+#app{padding-top:max(20px,env(safe-area-inset-top));padding-bottom:max(48px,env(safe-area-inset-bottom))}
+.ins{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:4px 16px 8px;margin:14px 0}
+.ins h2{margin:14px 0 4px;font-size:18px}
 </style>
 </head>
 <body>
@@ -120,7 +131,21 @@ function vHome(){const loose=mods.filter(m=>!m.fid||!fold(m.fid));
  (folders.length?`<h2>Папки</h2><ul class="list">${folders.map(f=>`<li><button class="mod fld" data-act="fold" data-id="${f.id}"><b>${esc(f.name)}</b><span>модулей: ${inF(f.id).length}, слов: ${nW(inF(f.id))}</span></button></li>`).join('')}</ul>`:'')+
  (loose.length?`${folders.length?'<h2>Без папки</h2>':''}<ul class="list">${loose.map(modBtn).join('')}</ul>`:'')+
  (!mods.length?'<p class="muted">Пока нет ни одного модуля. Создай первый: впиши слова и переводы списком.</p>':'')+
- `<div class="row"><button class="btn" data-act="new">Новый модуль</button><button class="btn ghost" data-act="newf">Новая папка</button></div><div class="row"><button class="btn ghost" data-act="recv">Получить от друга</button><button class="btn ghost" data-act="share">Резервная копия</button></div>`}
+ `<div class="row"><button class="btn" data-act="new">Новый модуль</button><button class="btn ghost" data-act="newf">Новая папка</button></div><div class="row"><button class="btn ghost" data-act="recv">Получить от друга</button><button class="btn ghost" data-act="share">Резервная копия</button>${isStandalone()?'':'<button class="btn ghost" data-act="install">Ярлык на экран</button>'}</div>`}
+
+const isStandalone=()=>{try{return matchMedia('(display-mode: standalone)').matches||navigator.standalone===true}catch(e){return false}};
+let deferredInstall=null;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;if(view.name==='install')render()});
+window.addEventListener('appinstalled',()=>{deferredInstall=null;view={name:'home',note:'Готово: ярлык добавлен.'};render()});
+function vInstall(){
+ return back('home','Все модули')+`<h1>Ярлык на экран</h1>
+<p class="muted">Приложение «Слова» появится среди других иконок, с твоим фото, и будет открываться на весь экран, без адресной строки. Слова уже сохранены в браузере и в ярлыке не потеряются.</p>
+${deferredInstall?'<div class="row"><button class="btn" data-act="doinstall">Добавить ярлык</button></div>':''}
+<div class="ins"><h2>iPhone и iPad (Safari)</h2><ol class="steps"><li>Открой сайт именно в Safari, не в Chrome и не внутри мессенджера.</li><li>Нажми кнопку «Поделиться» (квадрат со стрелкой вверх).</li><li>Выбери «На экран “Домой”» и нажми «Добавить».</li></ol></div>
+<div class="ins"><h2>Android (Chrome)</h2><ol class="steps"><li>Нажми меню ⋮ в правом верхнем углу.</li><li>Выбери «Установить приложение» или «Добавить на главный экран».</li></ol></div>
+<div class="ins"><h2>Компьютер (Chrome, Edge)</h2><ol class="steps"><li>В адресной строке справа найди значок установки (монитор со стрелкой) и нажми на него.</li><li>Или открой меню ⋮ и выбери «Установить “Слова”».</li></ol></div>
+<div class="ins"><h2>Mac (Safari)</h2><ol class="steps"><li>В меню выбери «Файл», затем «Добавить в Dock».</li></ol></div>
+<p class="muted small">Важно: у приложения-ярлыка и у сайта в браузере хранилища могут быть раздельными, особенно на iPhone. Перед установкой сделай «Резервную копию» и после установки вставь её через «Получить от друга».</p>`}
 
 function vFold(){const f=fold(view.fid),ms=inF(f.id),n=nW(ms),others=mods.filter(m=>m.fid!==f.id);
  return back('home','Все модули')+`<h1>${esc(f.name)}</h1><p class="muted">Модулей: ${ms.length}, слов: ${n}</p>
@@ -218,7 +243,7 @@ function vShare(){return back('home','Все модули')+`<h1>Резервн�
 <p id="fbk" class="muted small"></p>`}
 
 function render(){const v=view.name;
- app.innerHTML=(STORE_OK?'':WARN)+({home:vHome,mod:vMod,fold:vFold,fname:vFname,receive:vReceive,share1:vShare1,incoming:vIncoming,edit:vEdit,cards:vCards,write:vWrite,res:vRes,setup:vSetup,share:vShare})[v]();
+ app.innerHTML=(STORE_OK?'':WARN)+({home:vHome,mod:vMod,fold:vFold,fname:vFname,receive:vReceive,share1:vShare1,incoming:vIncoming,edit:vEdit,cards:vCards,write:vWrite,res:vRes,setup:vSetup,share:vShare,install:vInstall})[v]();
  app.dataset.lang=cur()?cur().lang:'';
  const i=$('#fn')||(S&&!S.checked?$('#ans'):null);if(i)i.focus();
  if(!(v==='write'&&S.checked))window.scrollTo(0,0);
@@ -276,6 +301,8 @@ const ACT={
  again(){start(S.mode,studyItems())},
  speak(b){speak(b.dataset.say.split('/')[0].trim(),LANGS[b.dataset.lang][1])},
  share(){view={name:'share'};render()},
+ install(){view={name:'install'};render()},
+ doinstall(){const p=deferredInstall;if(!p)return;deferredInstall=null;p.prompt();p.userChoice.finally(()=>render())},
  share1(){view={name:'share1',id:view.id,fid:view.fid};render()},
  nshare(){const f=$('#fbk'),no='Меню отправки не открылось. Нажми «Скопировать ссылку» и вставь её в сообщение.';
   shareLink().then(url=>navigator.share({title:srcTitle(),url})).catch(e=>{if(!e||e.name!=='AbortError')f.textContent=no})},
@@ -308,6 +335,7 @@ window.addEventListener&&window.addEventListener('hashchange',async()=>{await ch
 checkHash().then(()=>render());
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='fn'){e.preventDefault();ACT.sf()}});
 render();
+if('serviceWorker' in navigator&&location.protocol!=='file:')window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{})});
 </script>
 </body>
 </html>
