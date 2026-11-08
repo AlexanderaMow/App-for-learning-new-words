@@ -132,7 +132,7 @@ function noVoice(lang,auto){
   win:['Открой «Параметры», затем «Время и язык», затем «Речь».','В разделе «Управление голосами» нажми «Добавить голоса».','Найди язык: '+label+' и установи его. Затем перезапусти браузер.'],
   other:['Открой настройки системы и найди раздел про синтез речи или устный контент (на iPhone: «Универсальный доступ», на Android: «Язык и ввод»).','Добавь голос для языка: '+label+'.','Закрой приложение и открой его снова.']}[platform()];
  let b=$('#vbox');if(b)b.remove();b=document.createElement('div');b.id='vbox';b.setAttribute('role','dialog');b.setAttribute('aria-label','Нет голоса для озвучки');
- b.innerHTML='<b>Нет голоса для языка: '+esc(nm.toLowerCase())+'</b><p>Телефон или планшет не умеет произносить слова на этом языке, пока не скачан голос. Это делается один раз в настройках устройства:</p><ol class="steps">'+P.map(s=>'<li>'+s+'</li>').join('')+'</ol><p class="muted small">Если голос уже скачан, а окошко всё равно появляется, попробуй открыть сайт в другом браузере (например, Firefox или Яндекс Браузер).</p><p class="muted small">Браузер сейчас видит голоса для: '+esc([...new Set(VOICES.map(v=>String(v.lang||'').replace('_','-')))].sort().join(', ')||'ни одного языка')+'</p><button class="btn" data-act="closevb">Понятно</button>';
+ b.innerHTML='<b>Нет голоса для языка: '+esc(nm.toLowerCase())+'</b><p>Телефон или планшет не умеет произносить слова на этом языке, пока не скачан голос. Это делается один раз в настройках устройства:</p><ol class="steps">'+P.map(s=>'<li>'+s+'</li>').join('')+'</ol><p class="muted small">Если голос уже скачан, а окошко всё равно появляется, проверь в настройках синтеза речи, что основным выбран «Google Синтез речи», и полностью перезапусти браузер. Если не помогло, попробуй открыть сайт в другом браузере (например, Firefox или Яндекс Браузер).</p><p class="muted small">Браузер сейчас видит голоса для: '+esc([...new Set(VOICES.map(v=>String(v.lang||'').replace('_','-')))].sort().join(', ')||'ни одного языка')+'</p><button class="btn" data-act="closevb">Понятно</button>';
  document.body.appendChild(b)}
 function pickVoice(lang){
  const two=lang.slice(0,2).toLowerCase(),three=L3[two],norm=v=>String(v.lang||'').replace('_','-').toLowerCase();
@@ -142,8 +142,8 @@ function speak(text,lang,auto){
  if(!('speechSynthesis' in window)){if(!auto)toast('В этом браузере нет озвучки.');return}
  loadVoices();
  const v=pickVoice(lang);
- // Если браузер не показал голос для языка, всё равно пробуем: многие браузеры (например, на Huawei) не перечисляют
- // все голоса, но система умеет читать нужный язык. Окошко с инструкцией показывается только при реальной ошибке.
+ // Список голосов есть, но для этого языка в нём ничего нет: не читаем чужим голосом (иначе слово звучит с акцентом другого языка).
+ if(!v&&VOICES.length){noVoice(lang,auto);return}
  speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang=v?v.lang:lang;
  if(v)u.voice=v;u.rate=.9;
  u.onerror=e=>{if(e&&(e.error==='language-unavailable'||e.error==='synthesis-unavailable'||e.error==='voice-unavailable'))noVoice(lang,auto)};
