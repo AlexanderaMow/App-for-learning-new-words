@@ -175,7 +175,7 @@ const SAMPLE={en:'Good morning',fr:'Bonjour',de:'Guten Morgen',nl:'Goedemorgen',
 function vVoices(){loadVoices();
  const rows=VOICES.map(v=>`<li><span>${esc(v.name||'')}</span><span class="muted">${esc(String(v.lang||''))}</span><span></span></li>`).join('');
  return back('home','Все модули')+`<h1>Проверка озвучки</h1>
-<p class="muted">Нажми на кнопку каждого языка. Слово должно прозвучать на своём языке. Если немецкий и нидерландский звучат одинаково, значит, браузер не умеет выбирать язык.</p>
+<p class="muted">Нажми на кнопку каждого языка, чтобы проверить корректность озвучки. </p>
 <div class="row">${Object.keys(SAMPLE).map(k=>`<button class="btn ghost" data-act="vtest" data-code="${k}">${LANGS[k][0]}: ${esc(SAMPLE[k])}</button>`).join('')}</div>
 <h2>Голоса, которые видит браузер: ${VOICES.length}</h2>
 ${VOICES.length?`<ul class="words">${rows}</ul>`:'<p class="muted">Ни одного. Браузер не показывает сайту список голосов, но озвучка всё равно может работать.</p>'}
