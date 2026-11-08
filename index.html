@@ -67,6 +67,9 @@ small{color:var(--muted)}
 #app{padding-top:max(20px,env(safe-area-inset-top));padding-bottom:max(48px,env(safe-area-inset-bottom))}
 .ins{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:4px 16px 8px;margin:14px 0}
 .ins h2{margin:14px 0 4px;font-size:18px}
+#vbox{position:fixed;left:12px;right:12px;bottom:max(12px,env(safe-area-inset-bottom));max-width:616px;max-height:80vh;overflow:auto;margin:0 auto;background:var(--card);color:var(--ink);border:2px solid var(--accent);border-radius:14px;padding:16px 18px;z-index:20;box-shadow:0 6px 24px rgba(0,0,0,.3)}
+#vbox p{margin:8px 0}#vbox .btn{width:100%;margin-top:6px}
+#toast{display:none;position:fixed;left:16px;right:16px;bottom:max(16px,env(safe-area-inset-bottom));max-width:608px;margin:0 auto;background:#4a2a10;color:#fff;border-radius:10px;padding:12px 14px;font-size:14px;z-index:10;box-shadow:0 4px 16px rgba(0,0,0,.25)}
 </style>
 </head>
 <body>
@@ -109,12 +112,43 @@ function judge(inp,ans,ru){
 function parse(t){const lines=t.split('\n').map(l=>l.trim()).filter(Boolean);
  const words=lines.map(l=>{const p=l.split(/\s+[-–—]\s+|\t|;/);return p.length>1?{f:p[0].trim(),r:p.slice(1).join(' — ').trim()}:null}).filter(x=>x&&x.f&&x.r);
  return {words,skipped:lines.length-words.length}}
-function speak(text,lang){
- if(!('speechSynthesis' in window)){alert('В этом браузере нет озвучки.');return}
- speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang=lang;
- const vs=speechSynthesis.getVoices(),v=vs.find(v=>v.lang.replace('_','-')===lang)||vs.find(v=>v.lang.toLowerCase().startsWith(lang.slice(0,2)));
- if(v)u.voice=v;u.rate=.9;speechSynthesis.speak(u)}
-if('speechSynthesis' in window)speechSynthesis.getVoices();
+let VOICES=[],toastT=0;
+const loadVoices=()=>{try{VOICES=speechSynthesis.getVoices()||[]}catch(e){}};
+const L3={en:'eng',fr:'fra',de:'deu',nl:'nld',it:'ita'};
+function toast(msg){let t=$('#toast');if(!t){t=document.createElement('div');t.id='toast';t.setAttribute('role','status');document.body.appendChild(t)}
+ t.textContent=msg;t.style.display='block';clearTimeout(toastT);toastT=setTimeout(()=>{t.style.display='none'},9000)}
+const NATIVE={en:'English',fr:'Français',de:'Deutsch',nl:'Nederlands',it:'Italiano'};
+const shownVB=new Set();
+const platform=()=>{const ua=navigator.userAgent||'',pf=navigator.platform||'';
+ if(/iPhone|iPad|iPod/.test(ua)||(pf==='MacIntel'&&navigator.maxTouchPoints>1))return 'ios';
+ if(/Android/.test(ua))return 'android';if(/Mac/.test(pf))return 'mac';if(/Win/.test(pf))return 'win';return 'other'};
+function noVoice(lang,auto){
+ if(auto&&shownVB.has(lang))return;shownVB.add(lang);
+ const e=Object.entries(LANGS).find(([k,x])=>x[1]===lang),code=e?e[0]:'',nm=e?e[1][0]:lang,label=nm+(NATIVE[code]?' ('+NATIVE[code]+')':'');
+ const P={
+  ios:['Открой «Настройки» на устройстве.','Выбери «Универсальный доступ», затем «Устный контент», затем «Голоса».','Найди язык: '+label+', выбери любой голос и нажми значок скачивания (облако со стрелкой).','Дождись окончания загрузки, полностью закрой приложение и открой его снова.'],
+  android:['Открой «Настройки» на устройстве.','Выбери «Система» (на некоторых телефонах «Общие настройки»), затем «Язык и ввод», затем «Синтез речи».','Нажми на значок шестерёнки рядом с «Google Синтез речи» и выбери «Установить голосовые данные».','Найди язык: '+label+' и нажми значок скачивания. Потом закрой приложение и открой его снова.'],
+  mac:['Открой «Системные настройки», затем «Универсальный доступ», затем «Устный контент».','Нажми «Системный голос», затем «Управление голосами».','Найди язык: '+label+', отметь любой голос и скачай его.'],
+  win:['Открой «Параметры», затем «Время и язык», затем «Речь».','В разделе «Управление голосами» нажми «Добавить голоса».','Найди язык: '+label+' и установи его. Затем перезапусти браузер.'],
+  other:['Открой настройки системы и найди раздел про синтез речи или устный контент (на iPhone: «Универсальный доступ», на Android: «Язык и ввод»).','Добавь голос для языка: '+label+'.','Закрой приложение и открой его снова.']}[platform()];
+ let b=$('#vbox');if(b)b.remove();b=document.createElement('div');b.id='vbox';b.setAttribute('role','dialog');b.setAttribute('aria-label','Нет голоса для озвучки');
+ b.innerHTML='<b>Нет голоса для языка: '+esc(nm.toLowerCase())+'</b><p>Телефон или планшет не умеет произносить слова на этом языке, пока не скачан голос. Это делается один раз в настройках устройства:</p><ol class="steps">'+P.map(s=>'<li>'+s+'</li>').join('')+'</ol><button class="btn" data-act="closevb">Понятно</button>';
+ document.body.appendChild(b)}
+function pickVoice(lang){
+ const two=lang.slice(0,2).toLowerCase(),three=L3[two],norm=v=>String(v.lang||'').replace('_','-').toLowerCase();
+ const same=VOICES.filter(v=>{const l=norm(v);return l===two||l.startsWith(two+'-')||(three&&(l===three||l.startsWith(three+'-')))});
+ return same.find(v=>norm(v)===lang.toLowerCase())||same.find(v=>v.localService)||same[0]||null}
+function speak(text,lang,auto){
+ if(!('speechSynthesis' in window)){if(!auto)toast('В этом браузере нет озвучки.');return}
+ loadVoices();
+ const v=pickVoice(lang);
+ // Голоса загрузились, но для языка нет ни одного: не читаем чужим голосом (иначе слово читается с акцентом другого языка).
+ if(!v&&VOICES.length){noVoice(lang,auto);return}
+ speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang=v?v.lang:lang;
+ if(v)u.voice=v;u.rate=.9;
+ u.onerror=e=>{if(e&&(e.error==='language-unavailable'||e.error==='synthesis-unavailable'||e.error==='voice-unavailable'))noVoice(lang,auto)};
+ speechSynthesis.speak(u)}
+if('speechSynthesis' in window){loadVoices();try{speechSynthesis.addEventListener('voiceschanged',loadVoices)}catch(e){}}
 
 const back=(act,label,id)=>`<button class="link" data-act="${act}" ${id?`data-id="${id}"`:''}>← ${label}</button>`;
 const wd=(t,sp,l)=>`<div class="w">${esc(t)}</div>${sp?`<button class="ico" data-act="speak" data-lang="${l}" data-say="${esc(t)}" aria-label="Озвучить">${SPK}</button>`:''}`;
@@ -139,7 +173,7 @@ window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredIns
 window.addEventListener('appinstalled',()=>{deferredInstall=null;view={name:'home',note:'Готово: ярлык добавлен.'};render()});
 function vInstall(){
  return back('home','Все модули')+`<h1>Ярлык на экран</h1>
-<p class="muted">Приложение «Слова» появится среди других иконок и будет открываться на весь экран, без адресной строки. Слова уже сохранены в браузере и в ярлыке не потеряются. Если у тебя нет кнопки «Добавить ярлык», воспользуйся инструкцией снизу.</p>
+<p class="muted">Приложение «Слова» появится среди других иконок, с твоим фото, и будет открываться на весь экран, без адресной строки. Слова уже сохранены в браузере и в ярлыке не потеряются.</p>
 ${deferredInstall?'<div class="row"><button class="btn" data-act="doinstall">Добавить ярлык</button></div>':''}
 <div class="ins"><h2>iPhone и iPad (Safari)</h2><ol class="steps"><li>Открой сайт именно в Safari, не в Chrome и не внутри мессенджера.</li><li>Нажми кнопку «Поделиться» (квадрат со стрелкой вверх).</li><li>Выбери «На экран “Домой”» и нажми «Добавить».</li></ol></div>
 <div class="ins"><h2>Android (Chrome)</h2><ol class="steps"><li>Нажми меню ⋮ в правом верхнем углу.</li><li>Выбери «Установить приложение» или «Добавить на главный экран».</li></ol></div>
@@ -295,7 +329,8 @@ const ACT={
  dont(){const w=S.deck[S.i];w.miss++;S.wrong.push(w);adv()},
  check(){const w=S.deck[S.i],val=$('#ans').value,ru=cfg.show==='f',res=judge(val,ru?w.r:w.f,ru);
   S.checked={res,val};if(res!=='ok'){w.miss++;S.wrong.push(w)}
-  speak(w.f.split('/')[0].trim(),LANGS[w.lang][1]);render()},
+  speak(w.f.split('/')[0].trim(),LANGS[w.lang][1],true);render()},
+ closevb(){const b=$('#vbox');if(b)b.remove()},
  force(){const c=S.checked,w=S.deck[S.i];if(c&&c.res!=='ok'){S.wrong=S.wrong.filter(x=>x!==w);w.miss=Math.max(0,w.miss-1);c.res='ok';c.forced=1}render()},
  next(){adv()},
  again(){start(S.mode,studyItems())},
