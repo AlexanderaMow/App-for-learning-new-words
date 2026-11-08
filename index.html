@@ -148,7 +148,7 @@ function speak(text,lang,auto){
  if(v)u.voice=v;u.rate=.9;
  u.onerror=e=>{if(e&&(e.error==='language-unavailable'||e.error==='synthesis-unavailable'||e.error==='voice-unavailable'))noVoice(lang,auto)};
  speechSynthesis.speak(u)}
-if('speechSynthesis' in window){loadVoices();try{speechSynthesis.addEventListener('voiceschanged',loadVoices)}catch(e){}}
+if('speechSynthesis' in window){loadVoices();try{speechSynthesis.addEventListener('voiceschanged',loadVoices);speechSynthesis.addEventListener('voiceschanged',()=>{if(typeof view!=='undefined'&&view.name==='voices')render()})}catch(e){}}
 
 const back=(act,label,id)=>`<button class="link" data-act="${act}" ${id?`data-id="${id}"`:''}>← ${label}</button>`;
 const wd=(t,sp,l)=>`<div class="w">${esc(t)}</div>${sp?`<button class="ico" data-act="speak" data-lang="${l}" data-say="${esc(t)}" aria-label="Озвучить">${SPK}</button>`:''}`;
@@ -165,12 +165,21 @@ function vHome(){const loose=mods.filter(m=>!m.fid||!fold(m.fid));
  (folders.length?`<h2>Папки</h2><ul class="list">${folders.map(f=>`<li><button class="mod fld" data-act="fold" data-id="${f.id}"><b>${esc(f.name)}</b><span>модулей: ${inF(f.id).length}, слов: ${nW(inF(f.id))}</span></button></li>`).join('')}</ul>`:'')+
  (loose.length?`${folders.length?'<h2>Без папки</h2>':''}<ul class="list">${loose.map(modBtn).join('')}</ul>`:'')+
  (!mods.length?'<p class="muted">Пока нет ни одного модуля. Создай первый: впиши слова и переводы списком.</p>':'')+
- `<div class="row"><button class="btn" data-act="new">Новый модуль</button><button class="btn ghost" data-act="newf">Новая папка</button></div><div class="row"><button class="btn ghost" data-act="recv">Получить от друга</button><button class="btn ghost" data-act="share">Резервная копия</button>${isStandalone()?'':'<button class="btn ghost" data-act="install">Ярлык на экран</button>'}</div>`}
+ `<div class="row"><button class="btn" data-act="new">Новый модуль</button><button class="btn ghost" data-act="newf">Новая папка</button></div><div class="row"><button class="btn ghost" data-act="recv">Получить от друга</button><button class="btn ghost" data-act="share">Резервная копия</button><button class="btn ghost" data-act="voices">Проверка озвучки</button>${isStandalone()?'':'<button class="btn ghost" data-act="install">Ярлык на экран</button>'}</div>`}
 
 const isStandalone=()=>{try{return matchMedia('(display-mode: standalone)').matches||navigator.standalone===true}catch(e){return false}};
 let deferredInstall=null;
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;if(view.name==='install')render()});
 window.addEventListener('appinstalled',()=>{deferredInstall=null;view={name:'home',note:'Готово: ярлык добавлен.'};render()});
+const SAMPLE={en:'Good morning',fr:'Bonjour',de:'Guten Morgen',nl:'Goedemorgen',it:'Buongiorno'};
+function vVoices(){loadVoices();
+ const rows=VOICES.map(v=>`<li><span>${esc(v.name||'')}</span><span class="muted">${esc(String(v.lang||''))}</span><span></span></li>`).join('');
+ return back('home','Все модули')+`<h1>Проверка озвучки</h1>
+<p class="muted">Нажми на кнопку каждого языка. Слово должно прозвучать на своём языке. Если немецкий и нидерландский звучат одинаково, значит, браузер не умеет выбирать язык.</p>
+<div class="row">${Object.keys(SAMPLE).map(k=>`<button class="btn ghost" data-act="vtest" data-code="${k}">${LANGS[k][0]}: ${esc(SAMPLE[k])}</button>`).join('')}</div>
+<h2>Голоса, которые видит браузер: ${VOICES.length}</h2>
+${VOICES.length?`<ul class="words">${rows}</ul>`:'<p class="muted">Ни одного. Браузер не показывает сайту список голосов, но озвучка всё равно может работать.</p>'}
+<p class="muted small">Браузер: ${esc(navigator.userAgent||'')}</p>`}
 function vInstall(){
  return back('home','Все модули')+`<h1>Ярлык на экран</h1>
 <p class="muted">Приложение «Слова» появится среди других иконок, с твоим фото, и будет открываться на весь экран, без адресной строки. Слова уже сохранены в браузере и в ярлыке не потеряются.</p>
@@ -277,7 +286,7 @@ function vShare(){return back('home','Все модули')+`<h1>Резервн�
 <p id="fbk" class="muted small"></p>`}
 
 function render(){const v=view.name;
- app.innerHTML=(STORE_OK?'':WARN)+({home:vHome,mod:vMod,fold:vFold,fname:vFname,receive:vReceive,share1:vShare1,incoming:vIncoming,edit:vEdit,cards:vCards,write:vWrite,res:vRes,setup:vSetup,share:vShare,install:vInstall})[v]();
+ app.innerHTML=(STORE_OK?'':WARN)+({home:vHome,mod:vMod,fold:vFold,fname:vFname,receive:vReceive,share1:vShare1,incoming:vIncoming,edit:vEdit,cards:vCards,write:vWrite,res:vRes,setup:vSetup,share:vShare,install:vInstall,voices:vVoices})[v]();
  app.dataset.lang=cur()?cur().lang:'';
  const i=$('#fn')||(S&&!S.checked?$('#ans'):null);if(i)i.focus();
  if(!(v==='write'&&S.checked))window.scrollTo(0,0);
@@ -337,6 +346,8 @@ const ACT={
  speak(b){speak(b.dataset.say.split('/')[0].trim(),LANGS[b.dataset.lang][1])},
  share(){view={name:'share'};render()},
  install(){view={name:'install'};render()},
+ voices(){view={name:'voices'};render()},
+ vtest(b){const k=b.dataset.code;if(SAMPLE[k]&&LANGS[k])speak(SAMPLE[k],LANGS[k][1])},
  doinstall(){const p=deferredInstall;if(!p)return;deferredInstall=null;p.prompt();p.userChoice.finally(()=>render())},
  share1(){view={name:'share1',id:view.id,fid:view.fid};render()},
  nshare(){const f=$('#fbk'),no='Меню отправки не открылось. Нажми «Скопировать ссылку» и вставь её в сообщение.';
