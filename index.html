@@ -67,6 +67,7 @@ small{color:var(--muted)}
 #app{padding-top:max(20px,env(safe-area-inset-top));padding-bottom:max(48px,env(safe-area-inset-bottom))}
 .ins{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:4px 16px 8px;margin:14px 0}
 .ins h2{margin:14px 0 4px;font-size:18px}
+.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--line);text-align:center}
 #vbox{position:fixed;left:12px;right:12px;bottom:max(12px,env(safe-area-inset-bottom));max-width:616px;max-height:80vh;overflow:auto;margin:0 auto;background:var(--card);color:var(--ink);border:2px solid var(--accent);border-radius:14px;padding:16px 18px;z-index:20;box-shadow:0 6px 24px rgba(0,0,0,.3)}
 #vbox p{margin:8px 0}#vbox .btn{width:100%;margin-top:6px}
 #toast{display:none;position:fixed;left:16px;right:16px;bottom:max(16px,env(safe-area-inset-bottom));max-width:608px;margin:0 auto;background:#4a2a10;color:#fff;border-radius:10px;padding:12px 14px;font-size:14px;z-index:10;box-shadow:0 4px 16px rgba(0,0,0,.25)}
@@ -165,7 +166,7 @@ function vHome(){const loose=mods.filter(m=>!m.fid||!fold(m.fid));
  (folders.length?`<h2>Папки</h2><ul class="list">${folders.map(f=>`<li><button class="mod fld" data-act="fold" data-id="${f.id}"><b>${esc(f.name)}</b><span>модулей: ${inF(f.id).length}, слов: ${nW(inF(f.id))}</span></button></li>`).join('')}</ul>`:'')+
  (loose.length?`${folders.length?'<h2>Без папки</h2>':''}<ul class="list">${loose.map(modBtn).join('')}</ul>`:'')+
  (!mods.length?'<p class="muted">Пока нет ни одного модуля. Создай первый: впиши слова и переводы списком.</p>':'')+
- `<div class="row"><button class="btn" data-act="new">Новый модуль</button><button class="btn ghost" data-act="newf">Новая папка</button></div><div class="row"><button class="btn ghost" data-act="recv">Получить от друга</button><button class="btn ghost" data-act="share">Резервная копия</button><button class="btn ghost" data-act="voices">Проверка озвучки</button>${isStandalone()?'':'<button class="btn ghost" data-act="install">Ярлык на экран</button>'}</div>`}
+ `<div class="row"><button class="btn" data-act="new">Новый модуль</button><button class="btn ghost" data-act="newf">Новая папка</button></div><div class="row"><button class="btn ghost" data-act="recv">Получить от друга</button><button class="btn ghost" data-act="share">Резервная копия</button><button class="btn ghost" data-act="voices">Проверка озвучки</button></div>${isStandalone()?'':'<div class="foot"><button class="btn ghost" data-act="install">Ярлык на экран</button></div>'}`}
 
 const isStandalone=()=>{try{return matchMedia('(display-mode: standalone)').matches||navigator.standalone===true}catch(e){return false}};
 let deferredInstall=null;
@@ -175,7 +176,7 @@ const SAMPLE={en:'Good morning',fr:'Bonjour',de:'Guten Morgen',nl:'Goedemorgen',
 function vVoices(){loadVoices();
  const rows=VOICES.map(v=>`<li><span>${esc(v.name||'')}</span><span class="muted">${esc(String(v.lang||''))}</span><span></span></li>`).join('');
  return back('home','Все модули')+`<h1>Проверка озвучки</h1>
-<p class="muted">Нажми на кнопку каждого языка, чтобы проверить корректность озвучки. </p>
+<p class="muted">Нажми на кнопку каждого языка. Слово должно прозвучать на своём языке. Если немецкий и нидерландский звучат одинаково, значит, браузер не умеет выбирать язык.</p>
 <div class="row">${Object.keys(SAMPLE).map(k=>`<button class="btn ghost" data-act="vtest" data-code="${k}">${LANGS[k][0]}: ${esc(SAMPLE[k])}</button>`).join('')}</div>
 <h2>Голоса, которые видит браузер: ${VOICES.length}</h2>
 ${VOICES.length?`<ul class="words">${rows}</ul>`:'<p class="muted">Ни одного. Браузер не показывает сайту список голосов, но озвучка всё равно может работать.</p>'}
@@ -210,15 +211,21 @@ async function shareLink(){const base=location.href.split('#')[0],json=JSON.stri
 async function readShareHash(hash){if(hash.startsWith('#z=')){if(typeof DecompressionStream!=='function')throw Error('Этот браузер не поддерживает сжатые ссылки. Обнови Safari или Chrome.');const bytes=b64UrlToBytes(hash.slice(3));const stream=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));return JSON.parse(new TextDecoder().decode(await new Response(stream).arrayBuffer()))}if(hash.startsWith('#m='))return b64d(hash.slice(3));return null}
 const clearHash=()=>{try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}};
 
-function vShare1(){const f=view.fid;
+function vShare1(){const f=view.fid,n=shareData().ms.reduce((a,m)=>a+m.w.length,0);
  return (f?back('fold','Назад',f):back('open','Назад',view.id))+`<h1>Поделиться: ${esc(srcTitle())}</h1>
-<ol class="steps"><li>Нажми «Скопировать ссылку».</li><li>Вставь её в сообщение другу (Telegram, WhatsApp, почта).</li><li>Друг открывает ссылку, и сайт предлагает добавить ${f?'папку с модулями':'модуль'} к его словам. У тебя ничего не меняется.</li></ol>
+<p class="muted">Слов: ${n}. Выбери, как отправить ${f?'папку':'модуль'}.</p>
+<div class="ins"><h2>Ссылкой</h2>
+<p class="muted small">Удобно для небольших модулей. Нажми «Скопировать ссылку» и вставь её другу в сообщение. Друг откроет её, и сайт предложит добавить ${f?'папку':'модуль'} к его словам.</p>
 <div class="row"><button class="btn" data-act="copy">Скопировать ссылку</button>${navigator.share?'<button class="btn ghost" data-act="nshare">Отправить…</button>':''}</div>
 <p id="fbk" class="muted small"></p>
-<label>Ссылка<textarea id="ex" rows="3" readonly placeholder="Подготавливаю короткую ссылку…"></textarea></label>
+<label>Ссылка<textarea id="ex" rows="3" readonly placeholder="Готовлю ссылку…"></textarea></label>
 <p id="linkwarn" class="err small"></p>
 ${location.protocol==='file:'?'<p class="err small">Сейчас приложение открыто как файл, и такая ссылка у друга не откроется. Открой сайт по адресу на github.io и поделись оттуда.</p>':''}
-<p class="muted small">Если у друга приложение добавлено на главный экран телефона, пусть откроет в нём «Получить от друга» и вставит ссылку туда.</p>`}
+<p class="muted small">Если у друга приложение добавлено на главный экран телефона, пусть откроет в нём «Получить от друга» и вставит ссылку туда.</p></div>
+<div class="ins"><h2>Файлом</h2>
+<p class="muted small">Лучше для больших модулей и папок: у файла нет ограничения по длине, как у ссылки. Друг сохранит файл и загрузит его в приложении: «Все модули» → «Получить от друга» → «Выбрать файл».</p>
+<div class="row">${navigator.canShare?'<button class="btn" data-act="sendfile">Отправить файлом…</button>':''}<button class="btn ${navigator.canShare?'ghost':''}" data-act="savefile">Скачать файл</button></div>
+<p id="fbk2" class="muted small"></p></div>`}
 
 function vIncoming(){const d=view.data,ms=d.ms,n=ms.reduce((s,m)=>s+m.w.length,0);
  return `<div class="brand">Слова</div><h1>Тебе прислали ${d.fn?'папку':'модуль'}</h1><p><b>${esc(d.fn||ms[0].n)}</b></p>
@@ -272,12 +279,17 @@ function vRes(){const n=S.all.length,miss=S.all.reduce((s,w)=>s+w.miss,0),first=
 <div class="row"><button class="btn" data-act="again">Ещё раз</button><button class="btn ghost" data-act="setup">Настройки</button><button class="btn ghost" data-act="${view.fid?'fold':'open'}" data-id="${view.fid||view.id}">${view.fid?'К папке':'К модулю'}</button></div>`}
 
 function vReceive(){return back('home','Все модули')+`<h1>Получить от друга</h1>
-<p class="muted">Друг нажимает «Поделиться» на странице своего модуля и присылает тебе ссылку. Вставь её в поле ниже и нажми «Добавить».</p>
+<p class="muted">Друг мог прислать ссылку или файл. Выбери свой случай.</p>
+${view.note?`<p class="err">${esc(view.note)}</p>`:''}
+<div class="ins"><h2>Пришёл файл</h2>
+<ol class="steps"><li>Сохрани файл на телефон или компьютер: в мессенджере нажми на него и выбери «Сохранить» или «Скачать».</li><li>Нажми «Выбрать файл» ниже и найди сохранённый файл в загрузках или в приложении «Файлы».</li><li>Сайт покажет, что внутри. Нажми «Добавить к себе».</li></ol>
+<div class="row"><button class="btn" data-act="pickfile">Выбрать файл</button></div>
+<input type="file" id="fl" hidden></div>
+<div class="ins"><h2>Пришла ссылка</h2>
+<p class="muted small">Можно просто открыть ссылку в браузере: сайт сам предложит добавить модуль. Или вставь её в поле ниже и нажми «Добавить».</p>
 <textarea id="im" rows="4" placeholder="Вставь сюда ссылку"></textarea>
 <div class="row"><button class="btn ghost" data-act="paste">Вставить из буфера</button><button class="btn" data-act="imp">Добавить</button></div>
-<p id="fbk" class="muted small"></p>
-${view.note?`<p class="err">${esc(view.note)}</p>`:''}
-<p class="muted small">Можно и просто открыть присланную ссылку в браузере: сайт сам предложит добавить модуль.</p>`}
+<p id="fbk" class="muted small"></p></div>`}
 
 function vShare(){return back('home','Все модули')+`<h1>Резервная копия</h1>
 <p class="muted">Здесь все твои папки и модули одним текстом. Скопируй его и сохрани в заметки или отправь себе в мессенджер. Чтобы восстановить слова, открой «Получить от друга» и вставь этот текст.</p>
@@ -290,7 +302,7 @@ function render(){const v=view.name;
  app.dataset.lang=cur()?cur().lang:'';
  const i=$('#fn')||(S&&!S.checked?$('#ans'):null);if(i)i.focus();
  if(!(v==='write'&&S.checked))window.scrollTo(0,0);
- if(v==='share1')shareLink().then(link=>{const ex=$('#ex');if(ex)ex.value=link;const w=$('#linkwarn');if(w&&link.length>8000)w.textContent='Ссылка всё ещё очень длинная. Возможно, стоит разделить папку на несколько частей.'}).catch(()=>{const f=$('#fbk');if(f)f.textContent='Не удалось подготовить ссылку.'})}
+ if(v==='share1')shareLink().then(link=>{const ex=$('#ex');if(ex)ex.value=link;const w=$('#linkwarn');if(w&&link.length>2000)w.textContent='Ссылка получилась длинной ('+link.length+' символов). В некоторых мессенджерах она может обрезаться и не открыться. Надёжнее отправить файлом (ниже).'}).catch(()=>{const f=$('#fbk');if(f)f.textContent='Не удалось подготовить ссылку.'})}
 
 let cfg=Object.assign({show:'r',case:false,paren:false},(()=>{try{return JSON.parse(localStorage.getItem('slova-cfg'))||{}}catch(e){return{}}})());
 function start(mode,items){S={mode,all:items,deck:shuffle(items.slice()),i:0,round:1,wrong:[],checked:null};view={name:mode,id:view.id,fid:view.fid};render()}
@@ -361,18 +373,36 @@ const ACT={
  recv(){view={name:'receive'};render()},
  paste(){const f=$('#fbk'),no='Браузер не дал прочитать буфер. Нажми в поле выше, удерживай и выбери «Вставить».';
   try{navigator.clipboard.readText().then(s=>{$('#im').value=s;f.textContent=''}).catch(()=>{f.textContent=no})}catch(e){f.textContent=no}},
- imp(){(async()=>{try{const txt=$('#im').value.trim(),hashAt=txt.indexOf('#');
+ imp(){importText($('#im').value)},
+ pickfile(){$('#fl').click()},
+ sendfile(){const f=$('#fbk2'),{name,text}=fileData();
+  const cands=[new File([text],name+'.json',{type:'application/json'}),new File([text],name+'.txt',{type:'text/plain'})];
+  let ok=null;try{ok=cands.find(x=>navigator.canShare({files:[x]}))}catch(e){}
+  if(!ok){ACT.savefile();return}
+  navigator.share({files:[ok],title:srcTitle()}).catch(e=>{if(!e||e.name!=='AbortError')f.textContent='Меню отправки не открылось. Нажми «Скачать файл» и отправь его из загрузок.'})},
+ savefile(){const f=$('#fbk2'),{name,text}=fileData();
+  try{const url=URL.createObjectURL(new Blob([text],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download=name+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000);
+   f.textContent='Файл «'+name+'.json» сохранён. Найди его в загрузках (или в «Файлах») и отправь другу как документ.'}
+  catch(e){f.textContent='Не удалось сохранить файл.'}}
+};
+const fileData=()=>({name:(srcTitle()||'slova').replace(/[\\\/:*?"<>|]+/g,'').trim().slice(0,40)||'slova',text:JSON.stringify(shareData())});
+async function importText(txt){const home='Не получилось прочитать. Вставь ссылку целиком или выбери файл, который прислал друг.';
+ try{txt=String(txt).trim();const hashAt=txt.indexOf('#');
   if(hashAt>=0&&(txt.slice(hashAt).startsWith('#m=')||txt.slice(hashAt).startsWith('#z='))){const d=await readShareHash(txt.slice(hashAt).split(/\s/)[0]);if(!okP(d))throw 0;view={name:'incoming',data:d};render();return}
-  let j=JSON.parse(txt);if(Array.isArray(j))j={folders:[],mods:j};
+  let j=JSON.parse(txt);
+  if(okP(j)){view={name:'incoming',data:j};render();return}
+  if(Array.isArray(j))j={folders:[],mods:j};
   if(!j||!Array.isArray(j.mods))throw 0;const map={};
   (j.folders||[]).forEach(f=>{if(f&&f.name){const id=uid();map[f.id]=id;folders.push({id,name:String(f.name)})}});
   let n=0;j.mods.forEach(m=>{if(m&&LANGS[m.lang]&&m.name&&Array.isArray(m.words)){
    const ws=m.words.filter(w=>w&&w.f&&w.r).map(w=>({f:String(w.f),r:String(w.r)}));
    if(ws.length){mods.push({id:uid(),name:String(m.name),lang:m.lang,fid:map[m.fid]||'',words:ws});n++}}});
   save();view={name:'home',note:'Добавлено модулей: '+n}}
-  catch(e){view.note=e&&e.message?e.message:'Не получилось прочитать. Вставь ссылку или текст целиком.'}
-  render()})()}
-};
+ catch(e){view={name:'receive',note:e&&e.message&&!(e instanceof SyntaxError)?e.message:home}}
+ render()}
+document.addEventListener('change',e=>{const t=e.target;if(t&&t.id==='fl'&&t.files&&t.files[0]){const file=t.files[0];
+ if(file.size>10*1024*1024){view={name:'receive',note:'Файл слишком большой. Это точно файл со словами?'};render();return}
+ file.text().then(importText).catch(()=>{view={name:'receive',note:'Не удалось открыть файл.'};render()})}});
 document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(b&&ACT[b.dataset.act])ACT[b.dataset.act](b,b.dataset.id)});
 document.addEventListener('keydown',e=>{
  if(e.key==='Enter'&&view.name==='write'&&(e.target.id==='ans'||e.target===document.body)){e.preventDefault();S.checked?ACT.next():ACT.check()}});
