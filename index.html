@@ -139,16 +139,23 @@ function pickVoice(lang){
  const two=lang.slice(0,2).toLowerCase(),three=L3[two],norm=v=>String(v.lang||'').replace('_','-').toLowerCase();
  const same=VOICES.filter(v=>{const l=norm(v);return l===two||l.startsWith(two+'-')||(three&&(l===three||l.startsWith(three+'-')))});
  return same.find(v=>norm(v)===lang.toLowerCase())||same.find(v=>v.localService)||same[0]||null}
+// Разделители между формами слова: / \\ | , ; : · • → = — – ( ) [ ] { }, а также китайские/японские знаки, переводы строк и « - » с пробелами.
+const SPEAK_SEP=/[\/\\|,;:·•→⇒=—–()\[\]{}，、；：／（）\n\r]+|\s[-‐‑]\s/;
 function speak(text,lang,auto){
  if(!('speechSynthesis' in window)){if(!auto)toast('В этом браузере нет озвучки.');return}
  loadVoices();
  const v=pickVoice(lang);
  // Список голосов есть, но для этого языка в нём ничего нет: не читаем чужим голосом (иначе слово звучит с акцентом другого языка).
  if(!v&&VOICES.length){noVoice(lang,auto);return}
- speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang=v?v.lang:lang;
- if(v)u.voice=v;u.rate=.9;
- u.onerror=e=>{if(e&&(e.error==='language-unavailable'||e.error==='synthesis-unavailable'||e.error==='voice-unavailable'))noVoice(lang,auto)};
- speechSynthesis.speak(u)}
+ // Карточка может содержать несколько форм через любые разделители (go / went / gone, go, went; go: went и т.п.).
+ // Режем по разделителям и читаем каждую часть отдельной репликой по очереди, чтобы между формами была пауза.
+ const parts=String(text).split(SPEAK_SEP).map(x=>x.trim()).filter(x=>/[\p{L}\p{N}]/u.test(x));
+ if(!parts.length)parts.push(String(text).trim());
+ speechSynthesis.cancel();let failed=0;
+ parts.forEach(t=>{const u=new SpeechSynthesisUtterance(t);u.lang=v?v.lang:lang;
+  if(v)u.voice=v;u.rate=.9;
+  u.onerror=e=>{if(!failed&&e&&(e.error==='language-unavailable'||e.error==='synthesis-unavailable'||e.error==='voice-unavailable')){failed=1;noVoice(lang,auto)}};
+  speechSynthesis.speak(u)})}
 if('speechSynthesis' in window){loadVoices();try{speechSynthesis.addEventListener('voiceschanged',loadVoices);speechSynthesis.addEventListener('voiceschanged',()=>{if(typeof view!=='undefined'&&view.name==='voices')render()})}catch(e){}}
 
 const back=(act,label,id)=>`<button class="link" data-act="${act}" ${id?`data-id="${id}"`:''}>← ${label}</button>`;
@@ -350,12 +357,12 @@ const ACT={
  dont(){const w=S.deck[S.i];w.miss++;S.wrong.push(w);adv()},
  check(){const w=S.deck[S.i],val=$('#ans').value,ru=cfg.show==='f',res=judge(val,ru?w.r:w.f,ru);
   S.checked={res,val};if(res!=='ok'){w.miss++;S.wrong.push(w)}
-  speak(w.f.split('/')[0].trim(),LANGS[w.lang][1],true);render()},
+  speak(w.f,LANGS[w.lang][1],true);render()},
  closevb(){const b=$('#vbox');if(b)b.remove()},
  force(){const c=S.checked,w=S.deck[S.i];if(c&&c.res!=='ok'){S.wrong=S.wrong.filter(x=>x!==w);w.miss=Math.max(0,w.miss-1);c.res='ok';c.forced=1}render()},
  next(){adv()},
  again(){start(S.mode,studyItems())},
- speak(b){speak(b.dataset.say.split('/')[0].trim(),LANGS[b.dataset.lang][1])},
+ speak(b){speak(b.dataset.say,LANGS[b.dataset.lang][1])},
  share(){view={name:'share'};render()},
  install(){view={name:'install'};render()},
  voices(){view={name:'voices'};render()},
